@@ -1,0 +1,512 @@
+---
+title: "Practica_2"
+author: "Marcos Barrera"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+
+
+## RESUMEN EJECUTIVO
+
+
+Debido al elevado número de características que presentan hoy en día los vehículos, el potencial cliente puede encontrarse abrumado ante tal cantidad de informacion. Por medio de este estudio, se pretende dotar al consumidor y al vendedor de una rápida herramienta de busqueda, dependiendo de sus prioridades.
+
+Mediante el estudio estadistico de los datos, se presenta una solucion ya estudiada y contrastada de las diferentes prestaciones de los distintos automoviles. En esta, se podrán de manifiesto las características de los diferentes modelos desde una perspectiva de reducción y posterior agrupacion de la dimensión. 
+
+Por tanto, este estudio esta dirigido al consumidor que se encuentra en búsqueda de vehículo, a los agentes vendedores, que encontraran en este un instrumento de apoyo a sus ventas, y a todos aquellos amantes del motor que buscan conocer mas a fondo las posibilidades que pueden ofrecer los modelos de las marcas que comercializan todo-terrenos en España.
+
+
+## OBJETIVO DEL TRABAJO
+
+El objetivo del trabajo es llevar a cabo un analisis de los todo-terreno que estaban a la venta en España hace unos años. Se procedera del siguiente modo:
+
++ Realizar una reduccion de la dimension, si fuese posible, determinando las variables mas asociadas entre si y sus factores subyacentes;
++ Agrupacion de los diferentes todo-terrenos en el menor numero de grupos segun las puntuaciones factoriales que se desprenderan del analisis anterior.
+
+
+
+## DESCRIPCION DE LA BASE DE DATOS
+
+Los datos que manejamos están contenidos en las siguientes variables:
+
++ marca: Nombre de la marca del todo-terreno
++ modelo: Nombre del modelo del todo-terreno
++ pvp_euro: Precio de Venta al Publico, expresado en euros
++ cilindro: Numero de cilindros
++ cc: Cilindrada (en centimetros cubicos)
++ potencia: Potencia (CV)
++ rpm: Revoluciones Por Minuto
++ peso: Peso en kg
++ plazas: Numero de plazas
++ cons90: Consumo a 90 km/h
++ cons120: Consumo a 120 km/h
++ consurb: Consumo urbano
++ velocida: Velocidad maxima
++ acelerac: Aceleracion de 0 a 100 (en segundos)
++ acel2: Tiempo de acelaración, expresado como "mayor a 10 segundos" o "menor a 10 segundos"
+
+
+## CUESTIONES PREVIAS
+
+Nos encontramos ante una base de datos con 125 modelos de todo-terreno con 15 variables. Algunas de estas variables presentan un importante número de valores perdidos.
+
+Debido a la cantidad de estos valores contenidos en estas variables, no se considera oportuno eliminar las observaciones que contengan uno o más de estos. Para poder trabajar con todas las observaciones se han imputados dichos valores, siguiendo el procedimiento que se encuentra contenido y explicado en el Anexo II.
+
+Para realizar el análisis, se ha prescindido de la variable "acel2". 
+
+Dicha variable contenia el tiempo de acelaracion de los vehiculos expresado en "mayor a 10 segundos" y "menor a 10 segundos". La primera opción agrupaba al 97.6% de los todo-terrenos, por lo tanto se decide prescindir de ella dado la poca capacidad explicativa de la variable.
+
+
+## CONCLUSIONES
+
+Existen variables correlacionadas entre sí en los diferentes modelos de todo-terreno. Podemos ver brevemente un ejemplo en la seccion "Dos grupos" del Anexo III.
+Aqui, pueden observarse dos grupos donde la correlación es alta. En uno se incluyen la informacion del numero de cilindros, la potencia, la velocidad maxima y la cilindrada. En otro, el precio, el peso, los consumos a 90 y a 120 km/h y el consumo urbano.
+Son correlaciones lógicas ya que, por ejemplo, a mayor potencia, mayor será la velocidad, la cilindrada y el numero de cilindros del vehiculo.
+
+
+Tras el estudio de los datos y la realización de los analisis que pueden comprobarse en los anexos, se concluye que se puede realizar una reducción a dos dimensiones. Se ha realizado por medio de un análisis de componentes principales, quedando explicada el 72.17% de la varianza (Anexo IV).
+
+
+Tomando los datos de éste analisis, se ha realizado una agrupacion en tres clusters claramente diferenciados (Anexo V y VI). Se dividen en tres grupos:
+
++ Todo-terrenos de gama baja
++ Todo-terrenos de gama media
++ Todo-terrenos de gama alta
+
+Observando la media y la mediana de cada grupo en la diferentes variables, se observan diferencias en la potencia, numero de cilindros, cilindrada, velocidad maxima y consumos (Anexo VI).
+
+Por supuesto, la diferencia mas notable aparece en el precio, siendo determinante en la agrupacion. Sus medianas son de 15910 euros en la gama baja, 25303 en la gama media y 39657 en la gama alta (Anexo VI). 
+
+Tampoco puede obviarse la marca del coche más comun en los diferentes grupos, siendo Suzuki en la gama baja, Nissan en la gama media y Mercedes en el caso de la gama alta (Anexo VI).
+
+
+
+## ANEXO I: Carga de los datos y librerias
+
+```{r message=FALSE}
+
+# LIBRERIAS UTILIZADAS:
+
+library(memisc)                
+library(mice)                  
+library(VIM)                    
+library(missForest)             
+library(Hmisc)                  
+library(corrplot)               
+library(PerformanceAnalytics)   
+library(ppcor)                  
+library(psych)                  
+library(FactoMineR)             
+library(factoextra)
+library(cluster)               
+library(fpc)   
+```
+
+
+
+```{r}
+
+data = as.data.set(spss.system.file('tterreno_euro.sav'))
+
+colnames(data)
+
+data = as.data.frame(data)
+
+summary(data)
+
+str(data)
+
+```
+
+Procedemos a transformación de las variables que aparecen como factores a character (en el caso de "marca" y "modelo") y a numeric (cilindro y plazas). La variable "acel2" no ha sido modificada ya que la eliminaremos en el siguiente proceso.
+
+```{r}
+data2 = data
+
+data$marca = as.character(data$marca)
+data$modelo = as.character(data$modelo)
+data$cilindro = as.numeric(data$cilindro)
+data$plazas = as.numeric(data$plazas)
+```
+
+
+### Eliminacion de la variable "acel2"
+
+Eliminamos esta variable y reordenamos las variables para mayor comodidad a la hora de la imputacion de los valores perdidos: 
+
+```{r}
+data2 = data[c(1, 2, 3, 4, 5, 6, 7, 9, 8, 10, 11, 12, 13, 14)]
+```
+
+
+## ANEXO II: Tratamiento de los valores perdidos
+
+```{r}
+apply(is.na(data2), 2, sum)
+```
+
+Observamos un importante número de valores perdidos. Son especialmente altos en las variables "acelerac", "cons120" y "cons90", constituyendo el 37%, 12% y el 8% de sus observaciones respectivamente. Analizamos por tanto éstos en busca de patrones que puedan esclarecer la situación:
+
+```{r}
+md.pattern(data2)
+
+aggr_plot = aggr(data2, 
+                 col = c('green','red'), 
+                 numbers = TRUE, 
+                 sortVars = TRUE, 
+                 labels = names(data2), 
+                 cex.axis = 0.7, 
+                 gap = 3, 
+                 ylab = c("Histograma de valores perdidos", "Patrón"))
+aggr_plot
+```
+
+
+Debido a que en el 60.8% de los casos las observaciones tienen todas las variables completas y que en el 22.4% la unica variable que contiene valores perdidos es "acelerac", es recomendable proceder a la imputación de estos valores en vez de elimininarlos.
+Para ello, acudimos a la funcion "missForest", de la libreria con el mismo nombre. Elegimos sólo las columnas que 
+
+```{r}
+dataMF = missForest(data2[3:14])
+
+head(dataMF$ximp)
+```
+
+Una vez se ha completado la imputación, procedemos a la fusión de los datos completos con el resto del dataset:
+
+```{r}
+tterreno = cbind(data2[,1:2], dataMF$ximp)
+```
+
+
+## ANEXO III: Análisis exploratorio de los datos
+
+Elegimos las variables que vamos a utilizar. Una vez hemos eliminado "acel2" por los motivos ya comentados, procedemos a eliminar también "marca" y "modelo" ya que no será posible realizar los cálculos pertinentes si se encuentran en el dataset. Calculamos la matriz de correlaciones y la matriz de correlaciones y p-valor y visualizamos ésta última:
+
+
+```{r}
+tterreno_variables = tterreno[,-1:-2]
+
+cor.mat = round(cor(tterreno_variables), 2)
+cor.mat.nds= rcorr(as.matrix(tterreno_variables))
+cor.mat.nds
+```
+
+Visualizamos mediante un correlograma para mayor facilidad:
+
+```{r}
+corrplot(cor.mat, 
+         type="lower", 
+         order="original",
+         tl.col="black", 
+         tl.cex=0.7, tl.srt=45)
+```
+
+
+### Dos grupos:
+
+Como se ha comentado anteriormente, existen dos grupos con correlaciones importantes entre sus miembros:
+
+
+```{r}
+corrplot(cor.mat, type="full", order="hclust", addrect = 5,
+         tl.col="black", tl.cex=0.7, tl.srt=45) 
+```
+
+Realizamos el grafico de correlaciones para buscar correlaciones significativas:
+
+```{r warning=FALSE}
+chart.Correlation(tterreno_variables, histogram=TRUE, pch=19)
+```
+
+
+## ANEXO IV: Calculo del índice KMO y del test de esfericidad de Barlett
+
+Es importante el calculo de este estadistico la permite medir la calidad de las correlaciones entre las variables para evaluar la idoneidad del analisis de componentes principales y factorial
+
+```{r}
+# Creamos la matriz de correlaciones parciales
+
+p.cor.mat = pcor(tterreno_variables)
+p.cor.mat2=as.matrix(p.cor.mat$estimate)
+
+# KMO global:
+
+kmo.num = sum(cor.mat^2) - sum(diag(cor.mat^2))
+
+kmo.denom = kmo.num + (sum(p.cor.mat2^2) - sum(diag(p.cor.mat2^2)))
+kmo = kmo.num/kmo.denom
+kmo
+
+```
+
+El índice KMO se encuentra por encima de 0.7, lo que nos indica un valor aceptable para llevar a cabo PCA o factorial.
+
+Calculamos ahora el MSA o KMO parcial para cada una de las variables:
+
+```{r}
+p.cor.mat2=data.frame(p.cor.mat2)
+
+rownames(p.cor.mat2) = c(rownames(cor.mat))
+colnames(p.cor.mat2) = c(colnames(cor.mat))
+
+for (j in 1:ncol(tterreno_variables)){
+  kmo_j.num = sum(cor.mat[,j]^2) - cor.mat[j,j]^2
+  kmo_j.denom = kmo_j.num + (sum(p.cor.mat2[,j]^2) - p.cor.mat2[j,j]^2)
+  kmo_j = round(kmo_j.num/kmo_j.denom,4)
+  print(paste(colnames(tterreno_variables)[j], "=", kmo_j))
+}
+```
+
+Pasamos a realizar el test de Barlett. Ya que no será valido si el numero de observaciones supera las 100, muestreamos sobre 80 elegidas al azar:
+
+```{r}
+set.seed(1234)
+
+tterreno_variables.sam = tterreno_variables[sample(nrow(tterreno_variables), 80),]
+
+print(cortest.bartlett(cor.mat, n=nrow(tterreno_variables.sam)))
+```
+
+El p-valor es practicamente cero, lo que nos permite realizar el análisis de componentes principales:
+
+
+## ANEXO V: Análisis de componentes principales
+
+### Identificacion de los componentes principales
+
+```{r}
+tterreno_variables.acp = PCA(tterreno_variables, 
+                             scale.unit = TRUE, 
+                             ncp = ncol(tterreno_variables), 
+                             graph = TRUE)
+```
+
+
+```{r}
+print(tterreno_variables.acp)
+```
+
+
+
+```{r}
+tterreno_variables.acp$eig
+```
+ 
+Comprobamos que dos componentes explican una porcentaje muy importante de la varianza (72.08%). Comprobamos al mismo tiempo con la regla del codo:
+
+```{r}
+fviz_eig(tterreno_variables.acp, addlabels=T, hjust=-0.3)+
+labs(title="Gráfico de sedimentación")+
+theme_minimal()
+```
+
+Con esta regla confirmamos lo expuesto anteriormente. Recurrir a tres dimensiones en este caso no es adecuado ya que en la tercera nos encontramos con un 7.3%, cuando para estimarse valida tendria que ser al menos del 8.33% (12 variables, 8.33% cada una).
+
+Es una buena reduccion de la dimension dada la facilidad de su representacion grafica.
+
+Representamos gráficamente los autovalores y el porcentaje de varianza explicada:
+
+```{r}
+autoval= round(tterreno_variables.acp$eig, 2)
+
+
+barplot(autoval[, 2], names.arg=1:nrow(autoval), 
+        main = "Varianza explicada por los CCPP",
+        xlab = "Componentes Principales",
+        ylab = "Porcentaje explicado de la varianza",
+        col ="steelblue",
+        ylim=c(0,105))
+lines(x = 1:nrow(autoval), autoval[, 2], 
+      type="b", pch=19, col = "red")
+lines(x = 1:nrow(autoval), autoval[, 3], 
+      type="o", pch=21, col = "blue", bg="grey")
+```
+
+
+```{r}
+fviz_pca_var(tterreno_variables.acp)
+```
+
+
+
+Pasamos a comprobar como contribuyen las variables a las dos dimensiones:
+
+```{r}
+fviz_contrib(tterreno_variables.acp, choice="var", axes = 1 )+
+  labs(title = "Contribuciones a la Dim 1")
+```
+
+
+```{r}
+fviz_contrib(tterreno_variables.acp, choice="var", axes = 2 )+
+  labs(title = "Contribuciones a la Dim 2")
+```
+
+Y a ambos ejes:
+
+```{r}
+fviz_contrib(tterreno_variables.acp, choice="var", axes = 1:2) +
+  labs(title = "Contribuciones a las dos dimensiones")
+```
+
+
+Las dimesiones escogidas serían:
+
+```{r}
+tterreno_variables.acp$var$cor[,1:2]
+
+```
+
+Y sus coordenadas en el espacio 2D que crean:
+
+```{r}
+ACP = tterreno_variables.acp$ind$coord[,1:2]
+ACP
+summary(ACP)
+```
+
+
+## ANEXO VI: Agrupacion
+
+Una vez sabemos que podemos reducir la dimension, pasamos a analizar si podemos agrupar las observaciones teniendo en cuenta el análisis realizado anterioremente.
+
+Calculamos las distancias. No las representamos ya que debido al número de observaciones no se podrán obtener resultados claros de su visualizacion.
+
+```{r}
+q.dist = get_dist(ACP, stand = TRUE, method = "euclidean")
+
+```
+
+Creamos un dendograma que nos permita apreciar si existen agrupaciones:
+
+```{r}
+q.hc = hclust(q.dist, method = "ward.D2")
+plot(hclust(q.dist, method = "ward.D2"), cex=0.7, main="Dendrograma", ylab="Anchura",
+     xlab="AC. Método de Ward. Distancia euclídea")
+```
+
+
+Se pueden apreciar tres grupos distintos. Para comprobar, realizamos el mismo dendograma aplicando tres grupos:
+
+```{r}
+plot(hclust(q.dist, method = "ward.D2"), cex=0.7, main="Dendrograma", ylab="Anchura",
+     xlab="AC. Método de Ward. Distancia euclídea")
+rect.hclust(q.hc, k=3, border = 2:4)
+```
+
+Teniendo en cuenta estos resultados, dividimos los datos en tres grupos:
+
+```{r}
+grp = cutree(q.hc, k = 3)
+pam.q = pam(ACP, 3)
+pam.q$medoids
+clusters = fviz_cluster(pam.q, data=ACP, labelsize=8, stand=F, repel=TRUE)
+```
+
+E incluimos el cluster en el que se agrupan los diferentes grupos en el data frame donde tenemos el resto de la informacion
+
+
+```{r}
+tterreno = cbind(tterreno, clusters$data$cluster)
+
+```
+
+Comprobamos si los clusters pueden diferenciarse claramente:
+
+```{r}
+acp_g= fviz_pca_ind(tterreno_variables.acp, geom = "point",
+                    habillage=tterreno$`clusters$data$cluster`, addEllipses=T,
+                    ellipse.level= 0.95)+
+  labs(title = "Puntuaciones de las observaciones en las dimensiones")+
+  theme_minimal()
+print(acp_g) 
+```
+
+
+## ANEXO VII: Diferencias en los clusters
+
+Una vez hemos comprobados como efectivamente los cluster agrupan diferentes observaciones de manera clara, podemos pasar a examinar las diferencias entre los grupos 
+
+
+```{r}
+grupo1 = subset(tterreno, tterreno$`clusters$data$cluster`==1)
+summary(grupo1)
+
+```
+
+
+```{r}
+grupo2 = subset(tterreno, tterreno$`clusters$data$cluster`==2)
+summary(grupo2)
+```
+
+
+```{r}
+grupo3 = subset(tterreno, tterreno$`clusters$data$cluster`==3)
+summary(grupo3)
+```
+
+
+Se desprende claramente de las tres tablas anteriores que la agrupacion esta hecha siguiendo criterios de la gama del vehiculo, tanto por el precio como por las características de los todo-terreno.
+
+Marca mas comun en gama baja:
+
+```{r}
+gama_baja = grupo1
+
+sort(table(gama_baja$marca),decreasing=TRUE)[1]
+
+```
+
+
+Marca mas comunes en gama media:
+
+```{r}
+gama_media = grupo3
+
+sort(table(gama_media$marca),decreasing=TRUE)[1]
+```
+
+
+Marca mas comunes en gama alta:
+
+```{r}
+gama_alta = grupo2
+
+sort(table(gama_alta$marca),decreasing=TRUE)[1]
+```
+
+
+Añadimos al dataset original una columna que recoja el "nombre" de los clusters:
+
+```{r}
+tterreno$gama = 0
+tterreno$gama = replace(tterreno$gama,
+                        tterreno$`clusters$data$cluster` == 1,
+                        "Gama baja")
+tterreno$gama = replace(tterreno$gama,
+                        tterreno$`clusters$data$cluster` == 2,
+                        "Gama alta")
+tterreno$gama = replace(tterreno$gama,
+                        tterreno$`clusters$data$cluster` == 3,
+                        "Gama media")
+```
+
+
+
+```{r}
+fviz_pca_ind(tterreno_variables.acp, geom = "point",
+                    habillage=as.factor(tterreno$gama), addEllipses=T,
+                    ellipse.level= 0.95)+
+  labs(title = "Puntuaciones de las observaciones en las dimensiones")+
+  theme_minimal()
+```
+
+
