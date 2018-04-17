@@ -368,7 +368,7 @@ Y sus coordenadas en el espacio 2D que crean:
 
 ```{r}
 ACP = tterreno_variables.acp$ind$coord[,1:2]
-ACP
+head(ACP)
 summary(ACP)
 ```
 
